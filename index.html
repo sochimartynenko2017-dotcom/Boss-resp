@@ -1,0 +1,121 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#151b2b">
+<title>Респаун боссов</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:18px;background:#101827;color:#f4f6fb;font:16px Arial,sans-serif}
+h1{font-size:25px}
+.note{color:#b9c5d8;line-height:1.5}
+button,input{font:inherit;border-radius:9px;padding:10px}
+button{background:#2878e8;color:white;border:0;margin:5px 3px}
+input{background:#202c40;color:white;border:1px solid #52627a;max-width:100%}
+.card{background:#1b273a;border:1px solid #35445c;border-radius:12px;padding:13px;margin:12px 0}
+.name{font-weight:bold;font-size:18px;margin-bottom:8px}
+.time{color:#8fc4ff;margin:8px 0}
+small{color:#bdc8d8}
+</style>
+</head>
+<body>
+<h1>⚔️ Респаун боссов</h1>
+<p class="note">Укажи время следующего появления каждого босса. Сайт рассчитает последующие появления и напомнит за 3 минуты.</p>
+<button onclick="enableNotifications()">Включить уведомления</button>
+<div id="status" class="note">Уведомления пока не включены</div>
+<div id="bosses"></div>
+
+<script>
+const bosses=[
+["Чертуба",180],["Фелис",120],["Пан Марод",180],
+["Фаробас",270],["Брека",240],["Гарет",360],
+["Кельсус",360],["Базил",150],["Сабан",720],
+["Энкура",210],["Буря",210],["Тимиртис",301],
+["Талкин",300],["Талакин",420],["Лилит",720],
+["Селу",450],["Матура",241],["Драйд",480],
+["Каменук",240]
+];
+const saved=JSON.parse(localStorage.getItem("bossTimes")||"{}");
+const notified=new Set(JSON.parse(localStorage.getItem("notified")||"[]"));
+const root=document.getElementById("bosses");
+
+function save(){
+ localStorage.setItem("bossTimes",JSON.stringify(saved));
+}
+function render(){
+ root.innerHTML="";
+ bosses.forEach(([name,minutes],i)=>{
+  const card=document.createElement("div");
+  card.className="card";
+  const title=document.createElement("div");
+  title.className="name";
+  title.textContent=name+" — интервал "+(minutes/60)+" ч";
+  const input=document.createElement("input");
+  input.type="datetime-local";
+  input.style.width="100%";
+  input.value=saved[name]||"";
+  input.addEventListener("change",()=>{
+   saved[name]=input.value;
+   save();
+   check();
+  });
+  const info=document.createElement("div");
+  info.className="time";
+  info.id="info"+i;
+  info.textContent="Укажи время следующего появления";
+  card.append(title,input,info);
+  root.append(card);
+ });
+ update();
+}
+function nextTime(name,minutes){
+ if(!saved[name])return null;
+ const base=new Date(saved[name]).getTime();
+ if(!Number.isFinite(base))return null;
+ const interval=minutes*60000;
+ const now=Date.now();
+ return base>now?base:base+(Math.floor((now-base)/interval)+1)*interval;
+}
+function update(){
+ bosses.forEach(([name,minutes],i)=>{
+  const t=nextTime(name,minutes);
+  const el=document.getElementById("info"+i);
+  if(!el)return;
+  el.textContent=t?"Следующий респаун: "+new Date(t).toLocaleString("ru-RU"):"Укажи время следующего появления";
+ });
+}
+async function enableNotifications(){
+ if(!("Notification" in window)){
+  document.getElementById("status").textContent="Этот браузер не поддерживает уведомления";
+  return;
+ }
+ const permission=await Notification.requestPermission();
+ document.getElementById("status").textContent=
+  permission==="granted"?"✅ Уведомления разрешены":"Разрешение: "+permission;
+ check();
+}
+function check(){
+ const now=Date.now();
+ bosses.forEach(([name,minutes])=>{
+  const t=nextTime(name,minutes);
+  if(!t)return;
+  const key=name+"_"+t;
+  if(t-now<=180000 && t-now>0 && !notified.has(key)){
+   if("Notification" in window && Notification.permission==="granted"){
+    new Notification("Скоро респаун!",{
+     body:name+" появится примерно через 3 минуты"
+    });
+   }
+   notified.add(key);
+   localStorage.setItem("notified",JSON.stringify([...notified]));
+  }
+ });
+ update();
+}
+render();
+setInterval(check,10000);
+</script>
+</body>
+</html>
